@@ -25,8 +25,8 @@ Built using **Streamlit**, **Transformers**, and **Google Search**, it provides 
 
 ## 🧠 Developer Note
 
-As a beginner in programming, I built this project to:
-- Explore **Python**, **LLMs**, and **Streamlit**
+As a beginner in learning of GENA AI and LLMS, I built this project to:
+- Explore **LLMs**, and **Streamlit**
 - Solve real-world problems in interview prep
 - Create engaging tools for learners like me
 
