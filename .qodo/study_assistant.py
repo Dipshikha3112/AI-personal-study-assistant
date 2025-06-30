@@ -10,7 +10,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 # Set Hugging Face token (optional for these models)
-os.environ["HF_TOKEN"] = "Your-token-here"  # Replace with your actual token
+#os.environ["HF_TOKEN"] = "Your-token-here"  # Replace with your actual token # removed for security
 
 def load_model(model_name="gpt2"):
     """Load the language model and tokenizer based on the selected model."""
