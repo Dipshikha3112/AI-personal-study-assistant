@@ -1,0 +1,27 @@
+# Python cache and temporary files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+*.env
+
+# Streamlit and cache
+.streamlit/
+*.log
+
+# Large model files from transformers
+*.bin
+*.h5
+*.model
+%USERPROFILE%\.cache\huggingface\
+
+# System files
+Thumbs.db
+desktop.ini
+
+# JSON files (optional inclusion)
+chat_history.json
+performance_history.json
