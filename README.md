@@ -23,6 +23,21 @@ Built using **Streamlit**, **Transformers**, and **Google Search**, it provides 
 
 ---
 
+## 🧠 Developer Note
+
+As a beginner in programming, I built this project to:
+- Explore **Python**, **LLMs**, and **Streamlit**
+- Solve real-world problems in interview prep
+- Create engaging tools for learners like me
+
+This project taught me about:
+- API integration
+- Web UI building
+- Data visualization
+- Prompt engineering & model selection
+
+---
+
 ## ✨ Features
 
 ### 🧠 Chatbot Interface (http://localhost:8501)
@@ -134,20 +149,7 @@ streamlit run interview.py --server.port 8502
 
 ---
 
-## 🧠 Developer Note
 
-As a beginner in programming, I built this project to:
-- Explore **Python**, **LLMs**, and **Streamlit**
-- Solve real-world problems in interview prep
-- Create engaging tools for learners like me
-
-This project taught me about:
-- API integration
-- Web UI building
-- Data visualization
-- Prompt engineering & model selection
-
----
 
 
 
