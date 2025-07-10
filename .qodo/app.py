@@ -40,9 +40,8 @@ def main():
     st.write("Ask questions, set goals, generate quizzes, or prepare for interviews!")
 
     # Initialize session state
-    if "generator" not in st.session_state:
-        st.session_state.generator = None
-        st.session_state.model_name = "t5-small"  # Better for structured output
+    if "model_name" not in st.session_state:
+        st.session_state.model_name = "t5-small"  # Default model
         st.session_state.chat_history = chat_history.load_chat_history()
         st.session_state.awaiting_feedback = False
         st.session_state.last_input = None
@@ -66,8 +65,7 @@ def main():
         if model_name != st.session_state.model_name:
             with st.spinner("Loading model..."):
                 st.session_state.model_name = model_name
-                st.session_state.generator = study_assistant.load_model(model_name)[0]
-                st.session_state.chat_history = []
+                st.session_state.chat_history = []  # Clear history on model change
                 chat_history.save_chat_history(st.session_state.chat_history)
 
         st.header("Chat History")
@@ -114,14 +112,9 @@ def main():
             cmd = f"streamlit run {interview_script} --server.port {port}"
             os.system(cmd)
             webbrowser.open(f"http://localhost:{port}")
-            st.session_state.chat_history.append(("Assistant", f"Started {st.session_state.company} {st.session_state.role} Mock Interview in a new window."))
+            st.session_state.chat_history.append(("Assistant", f"Started {st.session_state.get('company', 'Mock')} {st.session_state.get('role', 'Interview')} Mock Interview in a new window."))
             chat_history.save_chat_history(st.session_state.chat_history)
             st.rerun()
-
-    # Load model if not already loaded
-    if not st.session_state.generator:
-        with st.spinner("Loading model..."):
-            st.session_state.generator = study_assistant.load_model(st.session_state.model_name)[0]
 
     # Input section
     st.subheader("Ask a Question, Set a Goal, or Prepare for an Interview")
@@ -136,41 +129,41 @@ def main():
         if not user_input.strip():
             user_input = "Provide a general answer or information relevant to software engineering."
         
-        with st.spinner("Processing with web search..."):
+        with st.spinner("Processing..."):
             st.session_state.chat_history.append(("You", user_input))
             st.session_state.current_input_type = input_type
             st.session_state.quiz_submitted = False
-            web_context = study_assistant.web_search(user_input)
-            if "error" in web_context.lower():
-                response = f"Error fetching web context: {web_context}"
+            if input_type == "Question":
+                response = study_assistant.generate_response(user_input, st.session_state.model_name)
                 st.session_state.chat_history.append(("Assistant", response))
-            else:
-                if input_type == "Question":
-                    response = study_assistant.generate_response(
-                        st.session_state.generator, user_input, st.session_state.model_name, web_context=web_context
-                    )
-                    st.session_state.chat_history.append(("Assistant", response))
-                elif input_type == "Goal":
-                    response = study_assistant.generate_study_plan(
-                        st.session_state.generator, user_input, st.session_state.model_name, web_context=web_context
-                    )
-                    st.session_state.chat_history.append(("Assistant (Study Plan)", response))
-                else:  # Interview Prep
-                    company = None
-                    if "for" in user_input.lower():
-                        company = user_input.lower().split("for")[-1].strip()
-                    response = quiz_generator.generate_quiz(
-                        st.session_state.generator, st.session_state.model_name, company=company, role="Software Engineer"
-                    )
-                    response_text = "\n".join([f"Question: {q['question']}\n" + "\n".join(q["options"]) + f"\nCorrect Answer: {q['correct_answer']}\nTip: {q['tip']}\n" for q in response[:3]])
-                    st.session_state.chat_history.append(("Assistant (Quiz)", response_text))
-                    st.session_state.current_quiz = response_text
-                    st.session_state.quiz_answers = {}
-                st.session_state.awaiting_feedback = True
-                st.session_state.last_input = user_input
-                st.session_state.last_answer = response
-                chat_history.save_chat_history(st.session_state.chat_history)
-                st.rerun()
+                st.session_state.debug_response = response
+            elif input_type == "Goal":
+                response = study_assistant.generate_study_plan(user_input, st.session_state.model_name)
+                st.session_state.chat_history.append(("Assistant (Study Plan)", response))
+                st.session_state.debug_response = response
+            else:  # Interview Prep
+                company = None
+                if "for" in user_input.lower():
+                    company = user_input.lower().split("for")[-1].strip()
+                response = study_assistant.generate_quiz(
+                    topic=user_input,
+                    model_name=st.session_state.model_name,
+                    is_interview_prep=True,
+                    company=company
+                )
+                response_text = "\n".join([
+                    f"Question: {q[0]}\n" + "\n".join(q[1]) + f"\nCorrect Answer: {q[2]}\nTip: {q[3] if q[3] else 'No tip provided'}\n"
+                    for q in parse_quiz(response)
+                ])
+                st.session_state.chat_history.append(("Assistant (Quiz)", response_text))
+                st.session_state.current_quiz = response_text
+                st.session_state.quiz_answers = {}
+                st.session_state.debug_response = response
+            st.session_state.awaiting_feedback = True
+            st.session_state.last_input = user_input
+            st.session_state.last_answer = response
+            chat_history.save_chat_history(st.session_state.chat_history)
+            st.rerun()
 
     # Chat container
     st.markdown('<div class="chat-container">', unsafe_allow_html=True)
@@ -215,6 +208,12 @@ def main():
                     if tip:
                         st.info(f"Tip: {tip}")
             st.write(f"**Score: {score}/{len(questions)}**")
+            quiz_generator.save_performance(
+                company="Mock" if "company" not in st.session_state else st.session_state.company,
+                role="Software Engineer",
+                score=score,
+                total_questions=len(questions)
+            )
             st.session_state.chat_history.append(("Assistant (Quiz Results)", f"Score: {score}/{len(questions)}"))
             chat_history.save_chat_history(st.session_state.chat_history)
             st.rerun()
@@ -231,43 +230,32 @@ def main():
                 st.rerun()
         with col2:
             if st.button("No"):
-                with st.spinner("Searching the web for a better answer..."):
-                    web_context = study_assistant.web_search(st.session_state.last_input)
-                    if "error" in web_context.lower():
-                        st.error(f"Assistant: {web_context}")
-                        st.session_state.chat_history.append(("Assistant (after web search)", web_context))
-                    else:
-                        if st.session_state.current_input_type == "Question":
-                            response = study_assistant.generate_response(
-                                st.session_state.generator,
-                                st.session_state.last_input,
-                                st.session_state.model_name,
-                                web_context=web_context
-                            )
-                        elif st.session_state.current_input_type == "Goal":
-                            response = study_assistant.generate_study_plan(
-                                st.session_state.generator,
-                                st.session_state.last_input,
-                                st.session_state.model_name,
-                                web_context=web_context
-                            )
-                        else:  # Interview Prep
-                            company = None
-                            if "for" in st.session_state.last_input.lower():
-                                company = st.session_state.last_input.lower().split("for")[-1].strip()
-                            response = quiz_generator.generate_quiz(
-                                st.session_state.generator,
-                                st.session_state.model_name,
-                                company=company,
-                                role="Software Engineer",
-                                web_context=web_context
-                            )
-                            response_text = "\n".join([f"Question: {q['question']}\n" + "\n".join(q["options"]) + f"\nCorrect Answer: {q['correct_answer']}\nTip: {q['tip']}\n" for q in response[:3]])
-                            st.session_state.current_quiz = response_text
-                            st.session_state.quiz_answers = {}
-                        st.session_state.chat_history.append(("Assistant (after web search)", response))
-                        st.session_state.last_answer = response
-                        st.session_state.awaiting_feedback = True
+                with st.spinner("Generating a better response..."):
+                    if st.session_state.current_input_type == "Question":
+                        response = study_assistant.generate_response(st.session_state.last_input, st.session_state.model_name)
+                        st.session_state.chat_history.append(("Assistant (after feedback)", response))
+                    elif st.session_state.current_input_type == "Goal":
+                        response = study_assistant.generate_study_plan(st.session_state.last_input, st.session_state.model_name)
+                        st.session_state.chat_history.append(("Assistant (Study Plan after feedback)", response))
+                    else:  # Interview Prep
+                        company = None
+                        if "for" in st.session_state.last_input.lower():
+                            company = st.session_state.last_input.lower().split("for")[-1].strip()
+                        response = study_assistant.generate_quiz(
+                            topic=st.session_state.last_input,
+                            model_name=st.session_state.model_name,
+                            is_interview_prep=True,
+                            company=company
+                        )
+                        response_text = "\n".join([
+                            f"Question: {q[0]}\n" + "\n".join(q[1]) + f"\nCorrect Answer: {q[2]}\nTip: {q[3] if q[3] else 'No tip provided'}\n"
+                            for q in parse_quiz(response)
+                        ])
+                        st.session_state.chat_history.append(("Assistant (Quiz after feedback)", response_text))
+                        st.session_state.current_quiz = response_text
+                        st.session_state.quiz_answers = {}
+                    st.session_state.last_answer = response
+                    st.session_state.debug_response = response
                     chat_history.save_chat_history(st.session_state.chat_history)
                     st.rerun()
 
